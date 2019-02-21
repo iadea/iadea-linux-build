@@ -1,0 +1,11 @@
+ifndef BUILDSPEC_PRODUCT
+BUILDSPEC_PRODUCT := lionking
+endif
+
+ifndef BUILDSPEC_OEM
+BUILDSPEC_OEM := iadea/oem/lionking
+endif
+
+ifndef BUILDSPEC_BASE_IMAGE
+BUILDSPEC_BASE_IMAGE := lionking-base-image
+endif

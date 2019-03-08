@@ -1,10 +1,19 @@
 #!/bin/bash
 
 set -e
-source "$(dirname $(realpath -e "${BASH_SOURCE[0]}"))/envsetup.sh"
+source "$(dirname $(readlink -e "${BASH_SOURCE[0]}"))/envsetup.sh"
 cd "${PROJECT_ROOT}"
 
 sudo rm -rf "${TARGET_SYSTEM_IMAGE}"
+
+finish() {
+    if [ -d "${__mount_point}" ] ; then
+        sudo umount "${__mount_point}"
+    fi
+    exit 1
+}
+
+trap finish ERR
 
 #
 # check kernel modules
@@ -75,16 +84,12 @@ ln -fs -T "${PROJECT_ROOT}/rootfs/binary" "${TARGET_ROOTFS}"
 sudo cp -drf "${TARGET_KERNEL_MODULES}"/* "${TARGET_ROOTFS}/"
 sudo cp -drf 'iadea/rootfs/overlay'/* "${TARGET_ROOTFS}/"
 
-
-finish() {
-	sudo umount "${TARGET_ROOTFS}/dev"
-	exit 1
-}
-trap finish ERR
-
-sudo mount -o bind /dev "${TARGET_ROOTFS}/dev"
+__mount_point="${TARGET_ROOTFS}/dev"
+sudo mount -o bind /dev "${__mount_point}"
 
 cat <<EOS | sudo chroot "${TARGET_ROOTFS}"
+
+mkdir -p /data
 
 if [ -e /usr/local/sbin/adbd -a ! -e /usr/local/bin/adbd ] ; then
     ln -fs ../sbin/adbd /usr/local/bin/adbd
@@ -97,13 +102,40 @@ true
 
 EOS
 
-sudo umount "${TARGET_ROOTFS}/dev"
+sudo umount "${__mount_point}"
+__mount_point=
 
 #
 # build system image
 #
 
-cmd=( mksquashfs "$(realpath -e "${TARGET_ROOTFS}")" "${TARGET_SYSTEM_IMAGE}" -noappend -ef 'iadea/rootfs/exclusion-list' -wildcards )
+case "${BUILDSPEC_FSTYPE:-squashfs}" in
+squashfs)
+    cmd=( mksquashfs "$(readlink -e "${TARGET_ROOTFS}")" "${TARGET_SYSTEM_IMAGE}" -noappend -ef 'iadea/rootfs/exclusion-list' -wildcards )
 
-sudo "${cmd[@]}" -comp 'lz4' -Xhc ||
-sudo "${cmd[@]}" -comp 'gzip' -Xcompression-level 9
+    sudo "${cmd[@]}" -comp 'lz4' -Xhc ||
+    sudo "${cmd[@]}" -comp 'gzip' -Xcompression-level 9
+    ;;
+
+ext4)
+    dd if=/dev/zero of="${TARGET_SYSTEM_IMAGE}" bs=1M count=0 seek=2048
+    mkfs.ext4 "${TARGET_SYSTEM_IMAGE}"
+
+    __mount_point="${TARGET_ROOTFS}-mirror"
+    mkdir -p "$__mount_point"
+    sudo mount -t ext4 -o rw "${TARGET_SYSTEM_IMAGE}" "${__mount_point}"
+
+    sudo rsync -ax --delete --exclude-from='iadea/rootfs/exclusion-list' "${TARGET_ROOTFS}"/ "${__mount_point}"/
+
+    sudo umount "${__mount_point}"
+    __mount_point=
+
+    fsck.ext4 -f -p "${TARGET_SYSTEM_IMAGE}" || [ "$?" -lt 4 ]
+    resize2fs -M "${TARGET_SYSTEM_IMAGE}"
+    ;;
+
+*)
+    echo "file system type '${BUILDSPEC_FSTYPE}' is not supported"
+    exit 1
+    ;;
+esac

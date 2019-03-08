@@ -1,7 +1,7 @@
 #!/bin/bash
 
 set -e
-source "$(dirname $(realpath -e "${BASH_SOURCE[0]}"))/envsetup.sh"
+source "$(dirname $(readlink -e "${BASH_SOURCE[0]}"))/envsetup.sh"
 cd "${PROJECT_ROOT}"
 
 rm -rf "${TARGET_BOOT_IMAGE}" "${TARGET_BOOT_RESOURCE}" "${TARGET_KERNEL_MODULES}"

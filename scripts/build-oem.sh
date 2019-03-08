@@ -1,7 +1,7 @@
 #!/bin/bash
 
 set -e
-source "$(dirname $(realpath -e "${BASH_SOURCE[0]}"))/envsetup.sh"
+source "$(dirname $(readlink -e "${BASH_SOURCE[0]}"))/envsetup.sh"
 cd "${PROJECT_ROOT}"
 
 rm -rf "${TARGET_OEM_IMAGE}"
@@ -15,7 +15,7 @@ if [ ! -d "${BUILDSPEC_OEM}" ] ; then
     exit 1
 fi
 
-cmd=( mksquashfs "$(realpath -e "${BUILDSPEC_OEM}")" "${TARGET_OEM_IMAGE}" -noappend -all-root )
+cmd=( mksquashfs "$(readlink -e "${BUILDSPEC_OEM}")" "${TARGET_OEM_IMAGE}" -noappend -all-root )
 
 "${cmd[@]}" -comp 'lz4' -Xhc ||
 "${cmd[@]}" -comp 'gzip' -Xcompression-level 9

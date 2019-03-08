@@ -1,6 +1,6 @@
 #!/bin/bash
 
-PROJECT_ROOT="$(dirname $(realpath -e "${BASH_SOURCE[0]}") | sed -ne 's|/iadea/build/scripts$||p')"
+PROJECT_ROOT="$(dirname $(readlink -e "${BASH_SOURCE[0]}") | sed -ne 's|/iadea/build/scripts$||p')"
 
 if [ -z "${PROJECT_ROOT}" ] ; then
     echo "canonical script path must end with /iadea/build/scripts"
